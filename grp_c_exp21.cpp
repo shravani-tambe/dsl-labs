@@ -1,197 +1,199 @@
+
+
 #include <iostream>
-#include <string>
+#include <ctime>
 using namespace std;
 
+// Class for a node (appointment)
 class Node {
 public:
-    string name;       
-    int start;         
-    int duration;      
-    Node* next;        
+    string name;           // Name of the person
+    int start_time;        // Start time of the appointment (in minutes from midnight)
+    int end_time;          // End time of the appointment (in minutes from midnight)
+    Node* next;            // Pointer to next node in the list
 
-    Node(string n, int s, int d) {
-        name = n;
-        start = s;
-        duration = d;
-        next = nullptr;
+    // Constructor to initialize the node
+    Node(string name, int start_time, int end_time) {
+        this->name = name;
+        this->start_time = start_time;
+        this->end_time = end_time;
+        this->next = nullptr;
     }
 };
 
-void show_free_slots(Node* head, int start_day, int end_day) {
-    Node* curr = head;
-    int last_end = start_day; 
+// Linked list head pointer
+Node* head = nullptr;
 
-    cout << "Free Slots:" << endl;
+// Function to display all free slots in a day
+void displayFreeSlots(int day_start, int day_end, int min_duration, int max_duration) {
+    cout << "Available slots are:\n";
+    int current_time = day_start;
+    Node* temp = head;
     
-    while (curr != nullptr) {
-        if (curr->start > last_end) {
-            cout << "Free slot from " << last_end / 100 << ":" << last_end % 100 << " to " << curr->start / 100 << ":" << curr->start % 100 << endl;
+    while (temp != nullptr) {
+        // Check for free slots between current_time and the start time of the next appointment
+        if (current_time < temp->start_time) {
+            int free_duration = temp->start_time - current_time;
+            if (free_duration >= min_duration) {
+                cout << "From " << current_time / 60 << ":" << current_time % 60 << " to "
+                     << temp->start_time / 60 << ":" << temp->start_time % 60 << endl;
+            }
         }
-        last_end = curr->start + curr->duration;
-        curr = curr->next;
+        current_time = temp->end_time;
+        temp = temp->next;
     }
-    if (last_end < end_day) {
-        cout << "Free slot from " << last_end / 100 << ":" << last_end % 100 
-             << " to " << end_day / 100 << ":" << end_day % 100 << endl;
+
+    // Check for free slots after the last appointment until the end of the day
+    if (current_time < day_end) {
+        cout << "From " << current_time / 60 << ":" << current_time % 60 << " to "
+             << day_end / 60 << ":" << day_end % 60 << endl;
     }
 }
 
-Node* book(Node* head, string n, int s, int d) {
-
-    if (s < 800 || (s + d) > 1700) { // Appointments between 8:00 AM and 5:00 PM
-        cout << "Please book between 8:00 AM and 5:00 PM." << endl;
-        return head;
+// Function to book an appointment
+void bookAppointment(string name, int start_time, int end_time) {
+    // Check if the time is valid
+    if (start_time >= end_time || start_time < 0 || end_time > 1440) {
+        cout << "Invalid appointment time!" << endl;
+        return;
     }
-
-    Node* curr = head;
-    while (curr != nullptr) {
-        if (!(s + d <= curr->start || s >= curr->start + curr->duration)) {
-            cout << "Time slot not available!" << endl;
-            return head;
-        }
-        curr = curr->next;
-    }
-
-    // Insert new appointment
-    Node* new_node = new Node(n, s, d);
     
-    if (head == nullptr || head->start > s) {
+    Node* new_node = new Node(name, start_time, end_time);
+
+    // Insert the new node into the list in sorted order based on time
+    if (head == nullptr || head->start_time > start_time) {   //so priority to our appointment.
         new_node->next = head;
-        return new_node;
+        head = new_node;
+    } else {
+        Node* temp = head;
+        while (temp->next != nullptr && temp->next->start_time < start_time) {
+            temp = temp->next;
+        }
+        new_node->next = temp->next;
+        temp->next = new_node;
     }
+    cout << "Appointment booked for " << name << " from " << start_time / 60 << ":" << start_time % 60
+         << " to " << end_time / 60 << ":" << end_time % 60 << endl;
+}
 
-    Node* prev = nullptr;
-    curr = head;
-
-    while (curr != nullptr && curr->start < s) {
-        prev = curr;
-        curr = curr->next;
+// Function to cancel an appointment
+void cancelAppointment(string name) {
+    if (head == nullptr) {
+        cout << "No appointments to cancel." << endl;
+        return;
     }
     
-    new_node->next = curr;
-    prev->next = new_node;
-    return head;
-}
-
-Node* cancel(Node* head, string n) {
-    Node* curr = head;
+    Node* temp = head;
     Node* prev = nullptr;
-
-    while (curr != nullptr) {
-        if (curr->name == n) {
-            if (prev == nullptr) {
-                head = curr->next;
-            } else {
-                prev->next = curr->next;
-            }
-            delete curr; 
-            cout << "Appointment canceled for " << n << endl;
-            return head;
-        }
-        prev = curr;
-        curr = curr->next;
-    }
-
-    cout << "No appointment found for " << n << endl;
-    return head;
-}
-
-Node* sort(Node* head) {
-    if (head == nullptr || head->next == nullptr) {
-        return head;
-    }
-
-    Node* sorted = nullptr;
-    Node* curr = head;
-
-    while (curr != nullptr) {
-        Node* next = curr->next; 
-        if (sorted == nullptr || sorted->start >= curr->start) {
-            curr->next = sorted;
-            sorted = curr;
-        } else {
-            Node* temp = sorted;
-            while (temp->next != nullptr && temp->next->start < curr->start) {
-                temp = temp->next;
-            }
-            curr->next = temp->next;
-            temp->next = curr;
-        }
-        curr = next; 
+    
+    // Search for the appointment by name
+    while (temp != nullptr && temp->name != name) {
+        prev = temp;
+        temp = temp->next;
     }
     
-    return sorted; 
-}
-
-void show_appointments(Node* head) {
-    Node* curr = head;
-
-    if (curr == nullptr) {
-        cout << "No appointments scheduled." << endl;
+    if (temp == nullptr) {
+        cout << "Appointment not found for " << name << endl;
         return;
     }
 
-    cout << "Scheduled Appointments:" << endl;
-    while (curr != nullptr) {
-        cout << "Name: " << curr->name 
-             << ", Start: " << curr->start / 100 << ":" << (curr->start % 100)
-             << ", Duration: " << curr->duration << " mins" << endl;
-        curr = curr->next;
+    // Remove the appointment from the linked list
+    if (prev == nullptr) {
+        head = head->next;
+    } else {
+        prev->next = temp->next;
+    }
+    delete temp;
+    cout << "Appointment for " << name << " has been canceled." << endl;
+}
+
+// Function to sort appointments based on time using pointer manipulation (insertion sort)
+void sortAppointments() {      // bubble sort method is used.
+    if (head == nullptr || head->next == nullptr) {
+        return;
+    }
+    
+    Node* sorted = nullptr;
+    Node* current = head;
+    
+    while (current != nullptr) {
+        Node* next = current->next;
+        // Insert current into sorted linked list
+        if (sorted == nullptr || sorted->start_time > current->start_time) {
+            current->next = sorted;
+            sorted = current;
+        } else {
+            Node* temp = sorted;
+            while (temp->next != nullptr && temp->next->start_time < current->start_time) {
+                temp = temp->next;
+            }
+            current->next = temp->next;
+            temp->next = current;
+        }
+        current = next;
+    }
+    head = sorted;
+}
+
+// Function to display all appointments
+void displayAppointments() {
+    if (head == nullptr) {
+        cout << "No appointments scheduled." << endl;
+        return;
+    }
+    
+    Node* temp = head;     //initialize
+    while (temp != nullptr) {
+        cout << "Appointment for " << temp->name << " from "
+             << temp->start_time / 60 << ":" << temp->start_time % 60 << " to "
+             << temp->end_time / 60 << ":" << temp->end_time % 60 << endl;
+        temp = temp->next;    //incrementation
     }
 }
 
 int main() {
-    Node* head = nullptr; 
-    int start_day = 800; // 8:00 AM
-    int end_day = 1700; // 5:00 PM
-    int ch;
+    int day_start = 9 * 60; // 9:00 AM in minutes
+    int day_end = 17 * 60;  // 5:00 PM in minutes
+    int min_duration = 30;  // Minimum duration of appointment in minutes
+    int max_duration = 120; // Maximum duration of appointment in minutes
 
     while (true) {
-        cout << "\nAppointment Scheduler Menu:" << endl;
-        cout << "1. Show Free Slots" << endl;
-        cout << "2. Book Appointment" << endl;
-        cout << "3. Cancel Appointment" << endl;
-        cout << "4. Sort Appointments" << endl;
-        cout << "5. Show Appointments" << endl;
-        cout << "6. Exit" << endl;
+        int choice;
+        cout << "\n1. Display Free Slots\n"
+             << "2. Book Appointment\n"
+             << "3. Cancel Appointment\n"
+             << "4. Sort Appointments\n"
+             << "5. Display Appointments\n"
+             << "6. Exit\n";
         cout << "Enter your choice: ";
-        cin >> ch;
+        cin >> choice;
 
-        switch (ch) {
-            case 1:
-                show_free_slots(head, start_day, end_day);
-                break;
-            case 2: {
-                string n;
-                int s, d;
-                cout << "Enter name: ";
-                cin >> n;
-                cout << "Enter start time: ";
-                cin >> s;
-                cout << "Enter duration in mins: ";
-                cin >> d;
-                head = book(head, n, s, d);
-                break;
-            }
-            case 3: {
-                string n;
-                cout << "Enter name to cancel: ";
-                cin >> n;
-                head = cancel(head, n);
-                break;
-            }
-            case 4:
-                head = sort(head);
-                cout << "Appointments sorted by time." << endl;
-                break;
-            case 5:
-                show_appointments(head);
-                break;
-            case 6:
-                cout << "Exiting." << endl;
-                return 0;
-            default:
-                cout << "Invalid choice! Please try again." << endl;
+        if (choice == 1) {
+            displayFreeSlots(day_start, day_end, min_duration, max_duration);
+        } else if (choice == 2) {
+            string name;
+            int start_time, end_time;
+            cout << "Enter your name: ";
+            cin >> name;
+            cout << "Enter appointment start time (minutes from midnight): ";
+            cin >> start_time;
+            cout << "Enter appointment end time (minutes from midnight): ";
+            cin >> end_time;
+            bookAppointment(name, start_time, end_time);
+        } else if (choice == 3) {
+            string name;
+            cout << "Enter name to cancel appointment: ";
+            cin >> name;
+            cancelAppointment(name);
+        } else if (choice == 4) {
+            sortAppointments();
+            cout << "Appointments sorted based on time.\n";
+        } else if (choice == 5) {
+            displayAppointments();
+        } else if (choice == 6) {
+            break;
+        } else {
+            cout << "Invalid choice. Please try again.\n";
         }
     }
 
